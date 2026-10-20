@@ -1,3 +1,4 @@
+/* Modified by the Sommelier project, 2026-10-20: builds with Xcode 26 and mingw-w64 15 (LGPL-2.1-or-later). */
 /*
  * This file is part of DXMT, Copyright (c) 2023 Feifan He
  *
@@ -15,6 +16,7 @@
 
 #include "../thread.hpp"
 #include "../log/log.hpp"
+#include <iomanip>
 
 namespace dxmt {
 

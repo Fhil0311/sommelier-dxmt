@@ -1,3 +1,4 @@
+/* Modified by the Sommelier project, 2026-10-20: builds with Xcode 26 and mingw-w64 15 (LGPL-2.1-or-later). */
 #include <metal_stdlib>
 
 using namespace metal;
@@ -150,7 +151,8 @@ struct TessMeshWorkload {
 
 int
 get_next_index(threadgroup int *out_count) {
-  return __metal_atomic_fetch_add_explicit(out_count, 1, int(memory_order_relaxed), __METAL_MEMORY_SCOPE_THREADGROUP__);
+  // The builtin's signature changed with Xcode 26's Metal toolchain; the standard atomic is the same instruction.
+  return atomic_fetch_add_explicit(reinterpret_cast<threadgroup atomic_int *>(out_count), 1, memory_order_relaxed);
 }
 
 template <partitioning partition>
