@@ -16,7 +16,7 @@
  *   height=1440
  *
  * `average` is frames per second over the time measured; `low1` is the frame rate of the slowest 1% of frames.
- * The first 20 seconds (loading, shader building) and gaps of a second or more (loading screens, alt-tab) are left
+ * The first 40 seconds (loading, shader building) and gaps of a second or more (loading screens, alt-tab) are left
  * out. Off unless SOMMELIER_FRAME_STATS_DIR is set.
  */
 #include <chrono>

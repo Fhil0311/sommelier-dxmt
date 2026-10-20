@@ -9,7 +9,7 @@
 
 namespace dxmt {
 
-static constexpr auto kSkip = std::chrono::seconds(20);
+static constexpr auto kSkip = std::chrono::seconds(40);   // loading and shader building
 static constexpr auto kWriteEvery = std::chrono::seconds(10);
 
 FrameStats &
