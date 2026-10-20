@@ -5,6 +5,7 @@
 #include "log/log.hpp"
 #include "util_env.hpp"
 #include "util_string.hpp"
+#include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <mutex>
@@ -34,7 +35,10 @@ cacheFolder() {
     uint64_t length = WMTGetUserCacheDir(buffer, sizeof(buffer));
     if (!length || length >= sizeof(buffer))
       return {};
-    base = std::string(buffer) + "/dxmt/" + env::getExeName() + "/";
+    base = std::string(buffer);
+    if (base.back() != '/')
+      base += '/';
+    base += "dxmt/" + env::getExeName() + "/";
   }
   if (base.back() != '/')
     base += '/';
@@ -106,9 +110,16 @@ PipelineRecords::add(uint32_t kind, const void *data, uint32_t size) {
     /* could be a brand new file whose folder exists but which we can't append to yet */
     file = fopen(path_.c_str(), "wb");
     fresh = true;
-    if (!file)
+    if (!file) {
+      if (!warned_) {
+        warned_ = true;
+        Logger::warn(str::format("Pipeline records: can't write ", path_));
+      }
       return;
+    }
   }
+  if (records_.size() == 1)
+    Logger::info(str::format("Pipeline records: writing to ", path_));
   if (fresh) {
     fwrite(kMagic, 1, 4, file);
     fwrite(&kPipelineRecordsVersion, 4, 1, file);
@@ -119,11 +130,52 @@ PipelineRecords::add(uint32_t kind, const void *data, uint32_t size) {
   fclose(file);
 }
 
+/* The same pipeline must give the same bytes on every run, so the records dedupe: the structs are copied field
+ * by field into zeroed memory (a struct copy would carry their padding bytes, which hold whatever was on the
+ * stack), with the per-process fields (functions, archives) left zero. */
+static void
+normalize(const WMTRenderPipelineInfo &in, WMTRenderPipelineInfo &out) {
+  memset(&out, 0, sizeof(out));
+  for (unsigned i = 0; i < 8; i++) {
+    out.colors[i].pixel_format = in.colors[i].pixel_format;
+    out.colors[i].rgb_blend_operation = in.colors[i].rgb_blend_operation;
+    out.colors[i].alpha_blend_operation = in.colors[i].alpha_blend_operation;
+    out.colors[i].src_rgb_blend_factor = in.colors[i].src_rgb_blend_factor;
+    out.colors[i].dst_rgb_blend_factor = in.colors[i].dst_rgb_blend_factor;
+    out.colors[i].src_alpha_blend_factor = in.colors[i].src_alpha_blend_factor;
+    out.colors[i].dst_alpha_blend_factor = in.colors[i].dst_alpha_blend_factor;
+    out.colors[i].write_mask = in.colors[i].write_mask;
+    out.colors[i].blending_enabled = in.colors[i].blending_enabled;
+  }
+  out.alpha_to_coverage_enabled = in.alpha_to_coverage_enabled;
+  out.logic_operation_enabled = in.logic_operation_enabled;
+  out.logic_operation = in.logic_operation;
+  out.rasterization_enabled = in.rasterization_enabled;
+  out.raster_sample_count = in.raster_sample_count;
+  out.depth_pixel_format = in.depth_pixel_format;
+  out.stencil_pixel_format = in.stencil_pixel_format;
+  out.immutable_vertex_buffers = in.immutable_vertex_buffers;
+  out.immutable_fragment_buffers = in.immutable_fragment_buffers;
+  out.input_primitive_topology = in.input_primitive_topology;
+  out.tessellation_partition_mode = in.tessellation_partition_mode;
+  out.max_tessellation_factor = in.max_tessellation_factor;
+  out.tessellation_output_winding_order = in.tessellation_output_winding_order;
+  out.tessellation_factor_step = in.tessellation_factor_step;
+}
+
+static void
+normalize(const WMTComputePipelineInfo &in, WMTComputePipelineInfo &out) {
+  memset(&out, 0, sizeof(out));
+  out.tgsize_is_multiple_of_sgwidth = in.tgsize_is_multiple_of_sgwidth;
+  out.immutable_buffers = in.immutable_buffers;
+}
+
 void
 PipelineRecords::addGraphics(CompiledShader *vs, CompiledShader *ps, const WMTRenderPipelineInfo &info) {
   if (!enabled_ || !vs)
     return;
-  PipelineRecordGraphicsData data{};
+  PipelineRecordGraphicsData data;
+  memset(&data, 0, sizeof(data));
   data.vs_sha1 = vs->ShaderDigest();
   data.vs_variant = vs->VariantDigest();
   if (ps) {
@@ -131,13 +183,7 @@ PipelineRecords::addGraphics(CompiledShader *vs, CompiledShader *ps, const WMTRe
     data.ps_sha1 = ps->ShaderDigest();
     data.ps_variant = ps->VariantDigest();
   }
-  data.info = info;
-  data.info.vertex_function = NULL_OBJECT_HANDLE;
-  data.info.fragment_function = NULL_OBJECT_HANDLE;
-  data.info.binary_archive_for_serialization = NULL_OBJECT_HANDLE;
-  data.info.binary_archives_for_lookup.set(nullptr);
-  data.info.num_binary_archives_for_lookup = 0;
-  data.info.fail_on_binary_archive_miss = false;
+  normalize(info, data.info);
   add(PipelineRecordGraphics, &data, sizeof(data));
 }
 
@@ -145,15 +191,11 @@ void
 PipelineRecords::addCompute(CompiledShader *cs, const WMTComputePipelineInfo &info) {
   if (!enabled_ || !cs)
     return;
-  PipelineRecordComputeData data{};
+  PipelineRecordComputeData data;
+  memset(&data, 0, sizeof(data));
   data.cs_sha1 = cs->ShaderDigest();
   data.cs_variant = cs->VariantDigest();
-  data.info = info;
-  data.info.compute_function = NULL_OBJECT_HANDLE;
-  data.info.binary_archive_for_serialization = NULL_OBJECT_HANDLE;
-  data.info.binary_archives_for_lookup.set(nullptr);
-  data.info.num_binary_archives_for_lookup = 0;
-  data.info.fail_on_binary_archive_miss = false;
+  normalize(info, data.info);
   add(PipelineRecordCompute, &data, sizeof(data));
 }
 
@@ -163,31 +205,69 @@ PipelineRecords::all() {
   return records_;
 }
 
+/* What one warm-up amounted to, logged by the last work to finish. */
+struct WarmUpSummary {
+  std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
+  std::atomic_uint32_t total = 0;
+  std::atomic_uint32_t finished = 0;
+  std::atomic_uint32_t built = 0;
+  std::atomic_uint32_t skipped = 0;
+  std::atomic_uint32_t failed = 0;
+
+  void
+  done(bool was_built, bool was_skipped) {
+    if (was_built)
+      built++;
+    else if (was_skipped)
+      skipped++;
+    else
+      failed++;
+    if (++finished == total.load()) {
+      auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count();
+      Logger::info(str::format("Pipeline warm-up: ", built.load(), " built, ", skipped.load(), " without cached shaders, ",
+                               failed.load(), " failed, in ", ms, " ms"));
+    }
+  }
+};
+
 /* One recorded pipeline, built again: its functions come from the shader cache, so this costs only Metal's
  * build for this GPU, which Metal then remembers. Nothing is kept: the game's own pipeline objects are made
  * as usual, from Metal's cache. */
 class WarmUpWork : public ThreadpoolWork {
 public:
-  WarmUpWork(MTLD3D11Device *device, ShaderCache &scache, PipelineRecords::Record record) :
+  WarmUpWork(MTLD3D11Device *device, ShaderCache &scache, PipelineRecords::Record record, std::shared_ptr<WarmUpSummary> summary) :
       device_(device),
       scache_(scache),
-      record_(std::move(record)) {}
+      record_(std::move(record)),
+      summary_(std::move(summary)) {}
 
   ThreadpoolWork *
   RunThreadpoolWork() final {
+    bool built = false, skipped = false;
+    run(built, skipped);
+    summary_->done(built, skipped);
+    return this;
+  }
+
+  void
+  run(bool &built, bool &skipped) {
     auto pool = WMT::MakeAutoreleasePool();
     WMT::Reference<WMT::Error> err;
     if (record_.kind == PipelineRecordGraphics && record_.data.size() == sizeof(PipelineRecordGraphicsData)) {
       PipelineRecordGraphicsData data;
       memcpy(&data, record_.data.data(), sizeof(data));
       auto vs = function("vs_", data.vs_sha1, data.vs_variant);
-      if (!vs)
-        return this;
+      if (!vs) {
+        skipped = true;
+        return;
+      }
       WMT::Reference<WMT::Function> ps;
       if (data.has_ps) {
         ps = function("ps_", data.ps_sha1, data.ps_variant);
-        if (!ps)
-          return this;
+        if (!ps) {
+          skipped = true;
+          return;
+        }
       }
       WMTRenderPipelineInfo info = data.info;
       info.vertex_function = vs.handle;
@@ -197,12 +277,15 @@ public:
       auto state = device_->GetMTLDevice().newRenderPipelineState(info, err);
       if (!state)
         WARN("Warm-up: a recorded render pipeline failed: ", err.description().getUTF8String());
+      built = state != nullptr;
     } else if (record_.kind == PipelineRecordCompute && record_.data.size() == sizeof(PipelineRecordComputeData)) {
       PipelineRecordComputeData data;
       memcpy(&data, record_.data.data(), sizeof(data));
       auto cs = function("cs_", data.cs_sha1, data.cs_variant);
-      if (!cs)
-        return this;
+      if (!cs) {
+        skipped = true;
+        return;
+      }
       WMTComputePipelineInfo info = data.info;
       info.compute_function = cs.handle;
       info.binary_archives_for_lookup.set(nullptr);
@@ -210,8 +293,8 @@ public:
       auto state = device_->GetMTLDevice().newComputePipelineState(info, err);
       if (!state)
         WARN("Warm-up: a recorded compute pipeline failed: ", err.description().getUTF8String());
+      built = state != nullptr;
     }
-    return this;
   }
 
   bool GetIsDone() final { return done_; }
@@ -240,6 +323,7 @@ private:
   MTLD3D11Device *device_;
   ShaderCache &scache_;
   PipelineRecords::Record record_;
+  std::shared_ptr<WarmUpSummary> summary_;
   std::atomic_bool done_ = false;
 };
 
@@ -256,9 +340,11 @@ WarmUpPipelines(MTLD3D11Device *device, ShaderCache &scache, std::vector<std::un
   if (all.empty())
     return;
   Logger::info(str::format("Pipeline warm-up: ", all.size(), " recorded pipelines"));
+  auto summary = std::make_shared<WarmUpSummary>();
+  summary->total = all.size();
   works.reserve(all.size());
   for (auto &record : all)
-    works.push_back(std::make_unique<WarmUpWork>(device, scache, std::move(record)));
+    works.push_back(std::make_unique<WarmUpWork>(device, scache, std::move(record), summary));
 }
 
 } // namespace dxmt

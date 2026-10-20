@@ -72,6 +72,7 @@ private:
 
   std::string path_;
   bool enabled_ = false;
+  bool warned_ = false;
   dxmt::mutex mutex_;
   std::unordered_set<std::string> seen_;
   std::vector<Record> records_;

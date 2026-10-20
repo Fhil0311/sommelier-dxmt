@@ -1,3 +1,4 @@
+/* Modified by the Sommelier project, 2026-10-20: flush the file log per message (LGPL-2.1-or-later). */
 /*
  * This file is part of DXMT, Copyright (c) 2023 Feifan He
  *
@@ -86,8 +87,10 @@ void Logger::emitMsg(LogLevel level, const std::string &message) {
           std::cerr << adjusted;
       }
 
-      if (m_fileStream)
+      if (m_fileStream) {
         m_fileStream << adjusted;
+        m_fileStream.flush(); /* a game that is killed still leaves its log */
+      }
     }
   }
 }
