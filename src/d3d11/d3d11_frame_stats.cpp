@@ -78,15 +78,45 @@ FrameStats::write() {
   double average = frames_ / seconds_;
   double slow = percentileMs(histogram_, frames_, 0.99);
   double low1 = slow > 0 ? 1000.0 / slow : 0;
-  FILE *file = fopen(path_.c_str(), "w");
-  if (!file) {
-    Logger::warn(str::format("Frame statistics: can't write ", path_));
-    enabled_ = false;
-    return;
+  char text[512];
+  snprintf(text, sizeof(text), "exe=%s\nframes=%llu\nseconds=%.1f\naverage=%.1f\nlow1=%.1f\nwidth=%u\nheight=%u\n",
+           exe_.c_str(), (unsigned long long)frames_, seconds_, average, low1, width_, height_);
+  {
+    std::lock_guard<std::mutex> lock(writer_mutex_);
+    pending_ = text;
   }
-  fprintf(file, "exe=%s\nframes=%llu\nseconds=%.1f\naverage=%.1f\nlow1=%.1f\nwidth=%u\nheight=%u\n", exe_.c_str(),
-          (unsigned long long)frames_, seconds_, average, low1, width_, height_);
-  fclose(file);
+  if (!writer_started_) {
+    writer_event_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    HANDLE thread = writer_event_ ? CreateThread(nullptr, 0, writerThread, this, 0, nullptr) : nullptr;
+    if (!thread) {
+      enabled_ = false;              // no thread, no statistics: never write on the presenting thread
+      return;
+    }
+    CloseHandle(thread);
+    writer_started_ = true;
+  }
+  SetEvent(writer_event_);
+}
+
+DWORD WINAPI
+FrameStats::writerThread(void *self) {
+  auto &stats = *static_cast<FrameStats *>(self);
+  for (;;) {
+    WaitForSingleObject(stats.writer_event_, INFINITE);
+    std::string text;
+    {
+      std::lock_guard<std::mutex> lock(stats.writer_mutex_);
+      text.swap(stats.pending_);
+    }
+    if (text.empty())
+      continue;
+    FILE *file = fopen(stats.path_.c_str(), "w");
+    if (!file)
+      continue;
+    fputs(text.c_str(), file);
+    fclose(file);
+  }
+  return 0;
 }
 
 } // namespace dxmt

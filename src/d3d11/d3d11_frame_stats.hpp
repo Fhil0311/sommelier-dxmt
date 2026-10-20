@@ -17,13 +17,15 @@
  *
  * `average` is frames per second over the time measured; `low1` is the frame rate of the slowest 1% of frames.
  * The first 40 seconds (loading, shader building) and gaps of a second or more (loading screens, alt-tab) are left
- * out. Off unless SOMMELIER_FRAME_STATS_DIR is set.
+ * out. Off unless SOMMELIER_FRAME_STATS_DIR is set. The file is written on a thread of its own, never on the thread
+ * that presents frames.
  */
 #include <chrono>
 #include <cstdint>
 #include <mutex>
 #include <string>
 #include <vector>
+#include <windows.h>
 
 namespace dxmt {
 
@@ -43,6 +45,7 @@ public:
 private:
   FrameStats();
   void write();
+  static DWORD WINAPI writerThread(void *self);
 
   using clock = std::chrono::steady_clock;
   bool enabled_ = false;
@@ -56,6 +59,12 @@ private:
   uint64_t frames_ = 0;
   double seconds_ = 0;
   uint32_t width_ = 0, height_ = 0;
+
+  /* The file is written on a thread of its own: the presenting thread only formats the text and hands it over. */
+  std::mutex writer_mutex_;
+  std::string pending_;
+  HANDLE writer_event_ = nullptr;
+  bool writer_started_ = false;
 };
 
 } // namespace dxmt
