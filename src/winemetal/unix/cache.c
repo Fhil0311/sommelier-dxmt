@@ -1,3 +1,4 @@
+/* Modified by the Sommelier project, 2026-10-20: pipeline records and warm-up (LGPL-2.1-or-later). */
 #import <Foundation/Foundation.h>
 #include "sqlite3.h"
 #define WINEMETAL_API
@@ -237,12 +238,35 @@ _WMTSetMetalShaderCachePath(void *obj) {
   return 0;
 };
 
+int
+_WMTGetUserCacheDir(void *obj) {
+  struct unixcall_getusercachedir *params = obj;
+  char buf[PATH_MAX];
+  size_t len = confstr(_CS_DARWIN_USER_CACHE_DIR, buf, sizeof(buf));
+  if (!len) {
+    params->ret_length = 0;
+    return 0;
+  }
+  size_t needed = strlen(buf);
+  params->ret_length = needed;
+  if (params->buffer.ptr && params->length > needed)
+    memcpy(params->buffer.ptr, buf, needed + 1);
+  return 0;
+}
+
 #else
 
 int
 WMTSetMetalShaderCachePath(void *obj) {
   struct unixcall_setmetalcachepath *params = obj;
   params->ret_success = 0;
+  return 0;
+}
+
+int
+_WMTGetUserCacheDir(void *obj) {
+  struct unixcall_getusercachedir *params = obj;
+  params->ret_length = 0;
   return 0;
 }
 

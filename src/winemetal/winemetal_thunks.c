@@ -1,3 +1,4 @@
+/* Modified by the Sommelier project, 2026-10-20: pipeline records and warm-up (LGPL-2.1-or-later). */
 #ifdef _WIN32
 #define WINEMETAL_API __declspec(dllexport)
 #else
@@ -1039,6 +1040,16 @@ CacheWriter_set(
   params.key_length = key_length;
   params.value_data = value;
   UNIX_CALL(118, &params);
+}
+
+WINEMETAL_API uint64_t
+WMTGetUserCacheDir(char *buffer, uint64_t length) {
+  struct unixcall_getusercachedir params;
+  WMT_MEMPTR_SET(params.buffer, buffer);
+  params.length = length;
+  params.ret_length = 0;
+  UNIX_CALL(132, &params);
+  return params.ret_length;
 }
 
 WINEMETAL_API bool

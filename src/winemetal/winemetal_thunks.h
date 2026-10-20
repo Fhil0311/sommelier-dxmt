@@ -1,3 +1,4 @@
+/* Modified by the Sommelier project, 2026-10-20: pipeline records and warm-up (LGPL-2.1-or-later). */
 
 #ifndef __WINEMETAL_THUNKS_H
 #define __WINEMETAL_THUNKS_H
@@ -315,6 +316,12 @@ struct unixcall_cache_alloc_init {
   struct WMTConstMemoryPointer path;
   uint64_t version;
   obj_handle_t ret_cache;
+};
+
+struct unixcall_getusercachedir {
+  struct WMTMemoryPointer buffer;
+  uint64_t length;
+  uint64_t ret_length;
 };
 
 struct unixcall_cache_get {

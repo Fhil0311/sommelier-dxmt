@@ -1,3 +1,4 @@
+/* Modified by the Sommelier project, 2026-10-20: pipeline records and warm-up (LGPL-2.1-or-later). */
 #include "d3d11_pipeline_cache.hpp"
 #include "airconv_public.h"
 #include "d3d11_device.hpp"
@@ -5,6 +6,7 @@
 #include "d3d11_pipeline.hpp"
 #include "dxmt_shader_cache.hpp"
 #include "dxmt_tasks.hpp"
+#include "d3d11_pipeline_records.hpp"
 #include "log/log.hpp"
 #include "sha1/sha1_util.hpp"
 #include "../d3d10/d3d10_shader.hpp"
@@ -191,6 +193,9 @@ class PipelineCache : public MTLD3D11PipelineCacheBase {
   ShaderCache& scache_;
 
   task_scheduler<ThreadpoolWork *> scheduler_;
+
+  /* Pipelines recorded on earlier runs, being built again ahead of the game's draws (see d3d11_pipeline_records). */
+  std::vector<std::unique_ptr<ThreadpoolWork>> warmup_works_;
 
   MTLD3D11Device *device;
   StateObjectCache<D3D11_BLEND_DESC1, IMTLD3D11BlendState> blend_states;
@@ -452,7 +457,11 @@ public:
       scache_(ShaderCache::getInstance(pDevice->GetDXMTDevice().metalVersion())),
       device(pDevice),
       blend_states(pDevice),
-      so_layouts(pDevice) {};
+      so_layouts(pDevice) {
+    WarmUpPipelines(pDevice, scache_, warmup_works_);
+    for (auto &work : warmup_works_)
+      scheduler_.submit(work.get());
+  };
 };
 
 std::unique_ptr<MTLD3D11PipelineCacheBase>

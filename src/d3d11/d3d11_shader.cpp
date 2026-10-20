@@ -1,3 +1,4 @@
+/* Modified by the Sommelier project, 2026-10-20: pipeline records and warm-up (LGPL-2.1-or-later). */
 #include "d3d11_shader.hpp"
 #include "Metal.hpp"
 #include "airconv_public.h"
@@ -104,6 +105,9 @@ public:
   bool GetIsDone() { return ready_; }
 
   void SetIsDone(bool state) { ready_.store(state); }
+
+  const Sha1Digest &ShaderDigest() final { return shader_->sha1(); }
+  const Sha1Digest &VariantDigest() final { return variant_digest_; }
 
 private:
   SM50_SHADER_COMMON_DATA sm50_common;

@@ -1,9 +1,11 @@
+/* Modified by the Sommelier project, 2026-10-20: pipeline records and warm-up (LGPL-2.1-or-later). */
 #include "Metal.hpp"
 #include "d3d11_private.h"
 #include "d3d11_pipeline.hpp"
 #include "d3d11_device.hpp"
 #include "d3d11_shader.hpp"
 #include "log/log.hpp"
+#include "d3d11_pipeline_records.hpp"
 #include <atomic>
 
 namespace dxmt {
@@ -105,6 +107,8 @@ public:
 
     TRACE("Compiled 1 PSO");
 
+    PipelineRecords::getInstance(device_->GetDXMTDevice().metalVersion()).addGraphics(VertexShader, PixelShader, info);
+
     return this;
   }
 
@@ -180,6 +184,8 @@ public:
     }
 
     TRACE("Compiled 1 PSO");
+
+    PipelineRecords::getInstance(device_->GetDXMTDevice().metalVersion()).addCompute(ComputeShader, info);
 
     return this;
   }

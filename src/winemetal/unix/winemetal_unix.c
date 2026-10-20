@@ -1,3 +1,4 @@
+/* Modified by the Sommelier project, 2026-10-20: pipeline records and warm-up (LGPL-2.1-or-later). */
 #include <stdatomic.h>
 #include <dlfcn.h>
 #import <Cocoa/Cocoa.h>
@@ -2825,6 +2826,7 @@ NTSTATUS _CacheReader_get(void *obj);
 NTSTATUS _CacheWriter_alloc_init(void *obj);
 NTSTATUS _CacheWriter_set(void *obj);
 NTSTATUS _WMTSetMetalShaderCachePath(void *obj);
+NTSTATUS _WMTGetUserCacheDir(void *obj);
 
 const void *__wine_unix_call_funcs[] = {
     &_NSObject_retain,
@@ -2959,6 +2961,7 @@ const void *__wine_unix_call_funcs[] = {
     &_MTLCommandBuffer_blitCommandEncoderWithSampleBuffers,
     &_MTLCommandBuffer_property,
     &_MTLDevice_newTileRenderPipelineState,
+    &_WMTGetUserCacheDir,
 };
 
 #ifndef DXMT_NATIVE
@@ -3095,5 +3098,6 @@ const void *__wine_unix_call_wow64_funcs[] = {
     &_MTLCommandBuffer_blitCommandEncoderWithSampleBuffers,
     &_MTLCommandBuffer_property,
     &_MTLDevice_newTileRenderPipelineState,
+    &_WMTGetUserCacheDir,
 };
 #endif

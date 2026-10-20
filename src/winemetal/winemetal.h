@@ -1,3 +1,4 @@
+/* Modified by the Sommelier project, 2026-10-20: pipeline records and warm-up (LGPL-2.1-or-later). */
 #ifndef _WINEMETAL_H
 #define _WINEMETAL_H
 
@@ -1865,6 +1866,10 @@ WINEMETAL_API obj_handle_t CacheWriter_alloc_init(const char *path, uint64_t ver
 WINEMETAL_API void CacheWriter_set(obj_handle_t writer, const void *key, uint64_t key_length, obj_handle_t value);
 
 WINEMETAL_API bool WMTSetMetalShaderCachePath(const char *path);
+
+/* The user's cache folder (DARWIN_USER_CACHE_DIR), where DXMT keeps its caches: for files the PE side writes itself.
+ * Returns the path's length; fills `buffer` when it is long enough (length + 1 for the terminator). */
+WINEMETAL_API uint64_t WMTGetUserCacheDir(char *buffer, uint64_t length);
 
 WINEMETAL_API obj_handle_t MTLDevice_newSharedTexture(obj_handle_t device, struct WMTTextureInfo *info);
 

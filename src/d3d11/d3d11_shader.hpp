@@ -1,3 +1,4 @@
+/* Modified by the Sommelier project, 2026-10-20: pipeline records and warm-up (LGPL-2.1-or-later). */
 #pragma once
 
 #include "airconv_public.h"
@@ -200,6 +201,9 @@ public:
   return false if it's not ready
    */
   virtual bool GetShader(MTL_COMPILED_SHADER *pShaderData) = 0;
+  /* The keys of this variant in the shader cache: what a pipeline record names it by (d3d11_pipeline_records). */
+  virtual const Sha1Digest &ShaderDigest() = 0;
+  virtual const Sha1Digest &VariantDigest() = 0;
 };
 
 class Shader {
