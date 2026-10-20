@@ -1,4 +1,6 @@
+/* Modified by the Sommelier project, 2026-10-20: frame statistics hook in UpdateStatistics (LGPL-2.1-or-later). */
 #include "d3d11_swapchain.hpp"
+#include "d3d11_frame_stats.hpp" // Sommelier
 #include "com/com_guid.hpp"
 #include "config/config.hpp"
 #include "d3d11_private.h"
@@ -811,6 +813,7 @@ public:
   };
 
   void UpdateStatistics(const FrameStatisticsContainer& statistics, uint64_t frame_id) {
+    FrameStats::instance().frame(desc_.Width, desc_.Height); // Sommelier: quiet frame statistics
     hud.begin();
     auto &frame = statistics.at(frame_id - 1); // show the previous one frame statistics
     auto &average = statistics.average();
