@@ -7,6 +7,7 @@
 #include "dxmt_shader_cache.hpp"
 #include "dxmt_tasks.hpp"
 #include "d3d11_pipeline_records.hpp"
+#include "d3d11_cellar.hpp"
 #include "log/log.hpp"
 #include "sha1/sha1_util.hpp"
 #include "../d3d10/d3d10_shader.hpp"
@@ -458,6 +459,7 @@ public:
       device(pDevice),
       blend_states(pDevice),
       so_layouts(pDevice) {
+    Cellar::getInstance(pDevice->GetDXMTDevice().metalVersion()).open(pDevice->GetMTLDevice());
     WarmUpPipelines(pDevice, scache_, warmup_works_);
     for (auto &work : warmup_works_)
       scheduler_.submit(work.get());

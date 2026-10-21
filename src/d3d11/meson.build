@@ -24,6 +24,7 @@ d3d11_src = [
   'd3d11_enumerable.cpp',
   'd3d11_pipeline_cache.cpp',
   'd3d11_pipeline_records.cpp',
+  'd3d11_cellar.cpp',
   'd3d11_frame_stats.cpp',
   'd3d11_context_imm.cpp',
   'd3d11_context_def.cpp',

@@ -1,3 +1,5 @@
+/* Modified by the Sommelier project, 2026-10-22: pipelines from the cellar (LGPL-2.1-or-later). */
+#include "d3d11_cellar.hpp"
 #include "Metal.hpp"
 #include "airconv_public.h"
 #include "d3d11_device.hpp"
@@ -145,6 +147,7 @@ public:
 
     {
       std::lock_guard<dxmt::mutex> lock(ts_global_mutex);
+      Cellar::getInstance(device_->GetDXMTDevice().metalVersion()).lookup(info);
       state_rasterization_ =
           device_->GetMTLDevice().newRenderPipelineState(info, err);
     }

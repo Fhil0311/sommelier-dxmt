@@ -1,3 +1,5 @@
+/* Modified by the Sommelier project, 2026-10-22: pipelines from the cellar (LGPL-2.1-or-later). */
+#include "d3d11_cellar.hpp"
 #include "Metal.hpp"
 #include "airconv_public.h"
 #include "d3d11_device.hpp"
@@ -111,6 +113,7 @@ public:
 
     info.raster_sample_count = SampleCount;
 
+    Cellar::getInstance(device_->GetDXMTDevice().metalVersion()).lookup(info);
     state_mesh_ = device_->GetMTLDevice().newRenderPipelineState(info, err);
 
     if (state_mesh_ == nullptr) {

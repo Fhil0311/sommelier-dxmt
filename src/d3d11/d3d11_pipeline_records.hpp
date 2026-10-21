@@ -78,6 +78,9 @@ private:
   std::vector<Record> records_;
 };
 
+/* DXMT's cache folder for this program as a unix path with a trailing slash (`…/dxmt/<exe>/`), or empty. */
+std::string PipelineCacheFolderUnix();
+
 /* Builds every recorded pipeline whose shaders the shader cache has, as thread pool works to submit. */
 void WarmUpPipelines(MTLD3D11Device *device, ShaderCache &scache, std::vector<std::unique_ptr<ThreadpoolWork>> &works);
 

@@ -1,5 +1,6 @@
 /* Added by the Sommelier project, 2026-10-20: pipeline records and warm-up (LGPL-2.1-or-later). */
 #include "d3d11_pipeline_records.hpp"
+#include "d3d11_cellar.hpp"
 #include "Metal.hpp"
 #include "config/config.hpp"
 #include "log/log.hpp"
@@ -26,9 +27,8 @@ PipelineRecords::getInstance(WMTMetalVersion version) {
   return *instance;
 }
 
-/* The folder DXMT's caches live in, as a path this (Windows) side can open: Wine shows the unix tree as Z:. */
-static std::string
-cacheFolder() {
+std::string
+PipelineCacheFolderUnix() {
   std::string base = env::getEnvVar("DXMT_SHADER_CACHE_PATH");
   if (base.empty() || base[0] != '/') {
     char buffer[4096];
@@ -42,6 +42,15 @@ cacheFolder() {
   }
   if (base.back() != '/')
     base += '/';
+  return base;
+}
+
+/* The folder DXMT's caches live in, as a path this (Windows) side can open: Wine shows the unix tree as Z:. */
+static std::string
+cacheFolder() {
+  std::string base = PipelineCacheFolderUnix();
+  if (base.empty())
+    return {};
   std::string windows = "Z:";
   for (char c : base)
     windows += c == '/' ? '\\' : c;
@@ -211,21 +220,25 @@ struct WarmUpSummary {
   std::atomic_uint32_t total = 0;
   std::atomic_uint32_t finished = 0;
   std::atomic_uint32_t built = 0;
+  /* Built in under 2 ms: taken from the cellar (or Metal's cache) rather than compiled. */
+  std::atomic_uint32_t instant = 0;
   std::atomic_uint32_t skipped = 0;
   std::atomic_uint32_t failed = 0;
 
   void
-  done(bool was_built, bool was_skipped) {
-    if (was_built)
+  done(bool was_built, bool was_skipped, double ms) {
+    if (was_built) {
       built++;
-    else if (was_skipped)
+      if (ms < 2.0)
+        instant++;
+    } else if (was_skipped)
       skipped++;
     else
       failed++;
     if (++finished == total.load()) {
       auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count();
-      Logger::info(str::format("Pipeline warm-up: ", built.load(), " built, ", skipped.load(), " without cached shaders, ",
-                               failed.load(), " failed, in ", ms, " ms"));
+      Logger::info(str::format("Pipeline warm-up: ", built.load(), " built (", instant.load(), " ready-made), ", skipped.load(),
+                               " without cached shaders, ", failed.load(), " failed, in ", ms, " ms"));
     }
   }
 };
@@ -244,8 +257,9 @@ public:
   ThreadpoolWork *
   RunThreadpoolWork() final {
     bool built = false, skipped = false;
+    auto started = std::chrono::steady_clock::now();
     run(built, skipped);
-    summary_->done(built, skipped);
+    summary_->done(built, skipped, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count());
     return this;
   }
 
@@ -273,7 +287,9 @@ public:
       info.vertex_function = vs.handle;
       info.fragment_function = data.has_ps ? ps.handle : NULL_OBJECT_HANDLE;
       info.binary_archives_for_lookup.set(nullptr);
+      info.num_binary_archives_for_lookup = 0;
       info.binary_archive_for_serialization = NULL_OBJECT_HANDLE;
+      Cellar::getInstance(device_->GetDXMTDevice().metalVersion()).lookup(info);
       auto state = device_->GetMTLDevice().newRenderPipelineState(info, err);
       if (!state)
         WARN("Warm-up: a recorded render pipeline failed: ", err.description().getUTF8String());
@@ -289,7 +305,9 @@ public:
       WMTComputePipelineInfo info = data.info;
       info.compute_function = cs.handle;
       info.binary_archives_for_lookup.set(nullptr);
+      info.num_binary_archives_for_lookup = 0;
       info.binary_archive_for_serialization = NULL_OBJECT_HANDLE;
+      Cellar::getInstance(device_->GetDXMTDevice().metalVersion()).lookup(info);
       auto state = device_->GetMTLDevice().newComputePipelineState(info, err);
       if (!state)
         WARN("Warm-up: a recorded compute pipeline failed: ", err.description().getUTF8String());

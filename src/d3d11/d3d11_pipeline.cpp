@@ -1,4 +1,5 @@
 /* Modified by the Sommelier project, 2026-10-20: pipeline records and warm-up (LGPL-2.1-or-later). */
+#include "d3d11_cellar.hpp"
 #include "Metal.hpp"
 #include "d3d11_private.h"
 #include "d3d11_pipeline.hpp"
@@ -98,6 +99,7 @@ public:
     info.immutable_vertex_buffers = (1 << 16) | (1 << 29) | (1 << 30);
     info.immutable_fragment_buffers = (1 << 29) | (1 << 30);
 
+    Cellar::getInstance(device_->GetDXMTDevice().metalVersion()).lookup(info);
     state_ = device_->GetMTLDevice().newRenderPipelineState(info, err);
 
     if (state_ == nullptr) {
@@ -176,6 +178,7 @@ public:
     info.tgsize_is_multiple_of_sgwidth = tgsize_is_multiple_of_sgwidth;
     info.immutable_buffers = (1 << 29) | (1 << 30);
 
+    Cellar::getInstance(device_->GetDXMTDevice().metalVersion()).lookup(info);
     state_ = device_->GetMTLDevice().newComputePipelineState(info, err);
 
     if (!state_) {
