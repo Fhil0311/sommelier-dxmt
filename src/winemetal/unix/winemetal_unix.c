@@ -1,4 +1,4 @@
-/* Modified by the Sommelier project, 2026-10-20: pipeline records and warm-up (LGPL-2.1-or-later). */
+/* Modified by the Sommelier project, 2026-10-20: pipeline records and warm-up; MetalFX HDR mode (LGPL-2.1-or-later). */
 #include <stdatomic.h>
 #include <dlfcn.h>
 #import <Cocoa/Cocoa.h>
@@ -1395,6 +1395,10 @@ _MTLDevice_newSpatialScaler(void *obj) {
   desc.inputHeight = info->input_height;
   desc.outputWidth = info->output_width;
   desc.outputHeight = info->output_height;
+  /* Sommelier: a half-float frame is linear and may hold HDR values above 1 (scRGB); MetalFX must be told, or it
+     treats them as gamma-encoded SDR and spoils highlights. 8- and 10-bit frames (sRGB, PQ) stay perceptual. */
+  if (desc.colorTextureFormat == MTLPixelFormatRGBA16Float)
+    desc.colorProcessingMode = MTLFXSpatialScalerColorProcessingModeHDR;
   params->ret = (obj_handle_t)[desc newSpatialScalerWithDevice:(id<MTLDevice>)params->device];
   [desc release];
   return STATUS_SUCCESS;
