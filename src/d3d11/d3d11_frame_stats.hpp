@@ -36,6 +36,10 @@ public:
   /* Called once per presented frame, with the size the game rendered at. */
   void frame(uint32_t width, uint32_t height);
 
+  /* Called when a swap chain is made: from then on the file is written every few seconds even while no frame is
+     presented (`presented=0`), so Sommelier can tell a game hanging on a black screen from one that never drew. */
+  void swapChainCreated();
+
   /* Pure helpers, kept separate so they can be checked on their own. */
   static double percentileMs(const std::vector<uint32_t> &histogram, uint64_t count, double fraction);
 
@@ -57,14 +61,16 @@ private:
   clock::time_point last_write_{};
   std::vector<uint32_t> histogram_;
   uint64_t frames_ = 0;
+  uint64_t presented_ = 0;          // every frame, the first seconds too
   double seconds_ = 0;
   uint32_t width_ = 0, height_ = 0;
 
-  /* The file is written on a thread of its own: the presenting thread only formats the text and hands it over. */
-  std::mutex writer_mutex_;
-  std::string pending_;
+  /* The file is written on a thread of its own: the presenting thread only signals it. */
   HANDLE writer_event_ = nullptr;
   bool writer_started_ = false;
+  bool heartbeat_ = false;          // a swap chain exists: write on a timer too
+  std::string text();               // the file's text now (takes mutex_)
+  bool startWriter();
 };
 
 } // namespace dxmt

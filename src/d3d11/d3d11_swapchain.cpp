@@ -132,6 +132,7 @@ public:
       hWnd(hWnd),
       monitor_(wsi::getWindowMonitor(hWnd)),
       hud(WMT::DeveloperHUDProperties::instance()) {
+    FrameStats::instance().swapChainCreated(); // Sommelier: the statistics file from now on, frames or not
 
     native_view_ = WMT::CreateMetalViewFromHWND((intptr_t)hWnd, pDevice->GetMTLDevice(), layer_weak_);
 
