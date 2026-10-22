@@ -1,4 +1,4 @@
-/* Modified by the Sommelier project, 2026-10-20: frame statistics hook in UpdateStatistics (LGPL-2.1-or-later). */
+/* Modified by the Sommelier project, 2026-10-20: frame statistics hook in UpdateStatistics; 2026-10-22: the MetalFX swap chain is logged (LGPL-2.1-or-later). */
 #include "d3d11_swapchain.hpp"
 #include "d3d11_frame_stats.hpp" // Sommelier
 #include "com/com_guid.hpp"
@@ -531,6 +531,13 @@ public:
       info.output_format =upscaled_backbuffer_->texture()->pixelFormat();
       metalfx_scaler = new SpatialScaler(device_->GetMTLDevice(), info);
       D3D11_ASSERT(metalfx_scaler && "otherwise metalfx failed to initialize");
+      // Sommelier: the launch log says when a game drew through MetalFX, so a crash before this line can't be
+      // blamed on Turbo (and a failed scaler is named, not just crashed on).
+      if (metalfx_scaler->scaler())
+        Logger::info(str::format("Turbo: MetalFX swap chain ", info.input_width, "x", info.input_height, " -> ",
+                                 info.output_width, "x", info.output_height));
+      else
+        ERR("Turbo: MetalFX spatial scaler could not be created for ", info.input_width, "x", info.input_height);
     }
 
     return S_OK;
