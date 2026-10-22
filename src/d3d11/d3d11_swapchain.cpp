@@ -1,4 +1,4 @@
-/* Modified by the Sommelier project, 2026-10-20: frame statistics hook in UpdateStatistics; 2026-10-22: the MetalFX swap chain is logged (LGPL-2.1-or-later). */
+/* Modified by the Sommelier project, 2026-10-20: frame statistics hook in UpdateStatistics; 2026-10-22: the MetalFX swap chain is logged, HDR use noted (LGPL-2.1-or-later). */
 #include "d3d11_swapchain.hpp"
 #include "d3d11_frame_stats.hpp" // Sommelier
 #include "com/com_guid.hpp"
@@ -1012,6 +1012,8 @@ public:
       DXGI_COLOR_SPACE_TYPE ColorSpace, UINT *pColorSpaceSupport) override {
     if (!pColorSpaceSupport)
       return E_INVALIDARG;
+    if (ColorSpace == DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020 || ColorSpace == DXGI_COLOR_SPACE_RGB_FULL_G10_NONE_P709)
+      FrameStats::instance().hdrSeen(1); // Sommelier: the game knows HDR
     *pColorSpaceSupport = CGColorSpace_checkColorSpaceSupported(ConvertColorSpace(ColorSpace, false))
             ? DXGI_SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG_PRESENT
             : 0;
@@ -1033,6 +1035,8 @@ public:
 
   HRESULT STDMETHODCALLTYPE
   SetColorSpace1(DXGI_COLOR_SPACE_TYPE ColorSpace) override {
+    if (ColorSpace == DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020 || ColorSpace == DXGI_COLOR_SPACE_RGB_FULL_G10_NONE_P709)
+      FrameStats::instance().hdrSeen(2); // Sommelier: the game switched to HDR
     auto target_color_space = ConvertColorSpace(ColorSpace, LayerSupportEDR());
     if (presenter->changeLayerColorSpace(target_color_space))
       device_context_->WaitUntilGPUIdle();

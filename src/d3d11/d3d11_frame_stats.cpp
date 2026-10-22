@@ -80,8 +80,8 @@ FrameStats::text() {
   double slow = percentileMs(histogram_, frames_, 0.99);
   double low1 = slow > 0 ? 1000.0 / slow : 0;
   char buffer[512];
-  snprintf(buffer, sizeof(buffer), "exe=%s\nframes=%llu\nseconds=%.1f\naverage=%.1f\nlow1=%.1f\nwidth=%u\nheight=%u\npresented=%llu\n",
-           exe_.c_str(), (unsigned long long)frames_, seconds_, average, low1, width_, height_, (unsigned long long)presented_);
+  snprintf(buffer, sizeof(buffer), "exe=%s\nframes=%llu\nseconds=%.1f\naverage=%.1f\nlow1=%.1f\nwidth=%u\nheight=%u\npresented=%llu\nhdr=%u\n",
+           exe_.c_str(), (unsigned long long)frames_, seconds_, average, low1, width_, height_, (unsigned long long)presented_, hdr_.load());
   return buffer;
 }
 
@@ -98,6 +98,11 @@ FrameStats::startWriter() {
   CloseHandle(thread);
   writer_started_ = true;
   return true;
+}
+
+void
+FrameStats::hdrSeen(unsigned bit) {
+  hdr_.fetch_or(bit);
 }
 
 void

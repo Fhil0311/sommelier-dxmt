@@ -1,6 +1,7 @@
 /* Added by the Sommelier project, 2026-10-20: frame statistics for Sommelier's compatibility reports
    (LGPL-2.1-or-later). */
 #pragma once
+#include <atomic>
 /*
  * Frame statistics: how fast the game ran, measured quietly (nothing is drawn). Every presented frame's time goes
  * into a histogram; every 10 seconds the totals are written, so they survive a crash:
@@ -40,6 +41,9 @@ public:
      presented (`presented=0`), so Sommelier can tell a game hanging on a black screen from one that never drew. */
   void swapChainCreated();
 
+  /* The game asked whether an HDR colour space can be presented (1), or switched to one (2): it knows HDR. */
+  void hdrSeen(unsigned bit);
+
   /* Pure helpers, kept separate so they can be checked on their own. */
   static double percentileMs(const std::vector<uint32_t> &histogram, uint64_t count, double fraction);
 
@@ -62,6 +66,7 @@ private:
   std::vector<uint32_t> histogram_;
   uint64_t frames_ = 0;
   uint64_t presented_ = 0;          // every frame, the first seconds too
+  std::atomic<unsigned> hdr_{0};
   double seconds_ = 0;
   uint32_t width_ = 0, height_ = 0;
 
